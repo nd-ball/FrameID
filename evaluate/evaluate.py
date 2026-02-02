@@ -59,11 +59,14 @@ class LlamaFrameChoiceModel(nn.Module):
             torch_dtype=torch.float16,
         )
         
-        self.llama = PeftModel.from_pretrained(
+        if adapter_dir is not None:
+          self.llama = PeftModel.from_pretrained(
                 base,
                 adapter_dir,
                 torch_dtype=torch.float16
             ).eval()
+        else:
+          self.llama = base.eval()
 
         self.tokenizer = AutoTokenizer.from_pretrained(base_model_name)
         
@@ -105,7 +108,7 @@ def compute_metrics(eval_pred):
 def parse_args():
     p = argparse.ArgumentParser(description="Evaluate Frame Identification with LoRA adapter (letter-choice logits).")
     p.add_argument("--dataset", required=True, help="Path to JSONL file (e.g., /path/to/test.jsonl)")
-    p.add_argument("--adapter", required=True, help="Path to LoRA adapter folder")
+    p.add_argument("--adapter", required=False, help="Path to LoRA adapter folder")
     return p.parse_args()
 
 
@@ -117,7 +120,10 @@ def main():
     new_data = load_dataset("json", data_files={"test": args.dataset})["test"]
     new_dataset = FrameIdentificationDataset(new_data, tokenizer)
 
-    model = LlamaFrameChoiceModel(BASE_MODEL_NAME, adapter_dir=args.adapter)
+    if not args.adapter:
+        model = LlamaFrameChoiceModel(BASE_MODEL_NAME)
+    else:
+        model = LlamaFrameChoiceModel(BASE_MODEL_NAME, adapter_dir=args.adapter)
     
     training_args = TrainingArguments(
         output_dir="./tmp",
